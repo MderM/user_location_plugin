@@ -375,8 +375,8 @@ class MyDirectionPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // create a bounding square, based on the centre and radius of the arc
     Rect rect = new Rect.fromCircle(
-      center: new Offset(30.0, 30.0),
-      radius: 40.0,
+      center: size.center(Offset(0,0)),
+      radius: 30.0,
     );
 
     // a fancy rainbow gradient
