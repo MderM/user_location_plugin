@@ -156,13 +156,11 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
                 alignment: AlignmentDirectional.center,
                 children: <Widget>[
                   if (_direction != null && widget.options.showHeading)
-                    ClipOval(
-                      child: Transform.rotate(
-                        angle: _direction / 180 * math.pi,
-                        child: CustomPaint(
-                          size: Size(60.0, 60.0),
-                          painter: MyDirectionPainter(),
-                        ),
+                    Transform.rotate(
+                      angle: _direction / 180 * math.pi,
+                      child: CustomPaint(
+                        size: Size(60.0, 60.0),
+                        painter: MyDirectionPainter(),
                       ),
                     ),
                   Container(
@@ -360,11 +358,15 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   }
 
   void forceMapUpdate() {
-    var zoom = widget.options.mapController.zoom;
-    widget.options.mapController.move(widget.options.mapController.center,
-        widget.options.mapController.zoom + 0.000001);
-    widget.options.mapController
-        .move(widget.options.mapController.center, zoom);
+    if (widget.map != null) {
+      widget.map.forceRebuild();
+    } else {
+      var zoom = widget.options.mapController.zoom;
+      widget.options.mapController.move(widget.options.mapController.center,
+          widget.options.mapController.zoom + 0.000001);
+      widget.options.mapController
+          .move(widget.options.mapController.center, zoom);
+    }
   }
 }
 
@@ -373,7 +375,7 @@ class MyDirectionPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // create a bounding square, based on the centre and radius of the arc
     Rect rect = new Rect.fromCircle(
-      center: new Offset(30.0, 30.0),
+      center: new Offset(0.0, 0.0),
       radius: 40.0,
     );
 
