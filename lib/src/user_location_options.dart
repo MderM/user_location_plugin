@@ -7,6 +7,8 @@ class SimpleLocationData {
   double lng;
   double heading;
   double accuracy;
+
+  SimpleLocationData.name({this.lat, this.lng, this.heading, this.accuracy});
 }
 
 class UserLocationOptions extends LayerOptions {
