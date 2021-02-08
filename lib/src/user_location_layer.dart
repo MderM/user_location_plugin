@@ -6,7 +6,7 @@ import 'package:flutter_map/plugin_api.dart';
 import 'package:user_location/src/user_location_marker.dart';
 import 'package:user_location/src/user_location_options.dart';
 import 'package:latlong/latlong.dart';
-import 'package:location/location.dart';
+//import 'package:location/location.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import "dart:math" show pi;
@@ -26,15 +26,16 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   LatLng _currentLocation;
   UserLocationMarker _locationMarker;
-  EventChannel _stream = EventChannel('locationStatusStream');
-  var location = Location();
+  Stream<LatLng> _stream;
+  // EventChannel _stream = EventChannel('locationStatusStream');
+  // var location = Location();
 
   bool mapLoaded;
   bool initialStateOfupdateMapLocationOnPositionChange;
 
   double _direction;
 
-  StreamSubscription<LocationData> _onLocationChangedStreamSubscription;
+  StreamSubscription<LatLng> _onLocationChangedStreamSubscription;
   StreamSubscription<double> _compassStreamSubscription;
   StreamSubscription _locationStatusChangeSubscription;
 
@@ -87,6 +88,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   }
 
   void initialize() async {
+    /*
     bool _serviceEnabled;
     PermissionStatus _permissionGranted;
 
@@ -105,6 +107,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
         return;
       }
     }
+     */
 
     _handleLocationStatusChanges();
     _subscribeToLocationChanges();
@@ -119,6 +122,94 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
 
   Future<void> _subscribeToLocationChanges() async {
     printLog("OnSubscribe to location change");
+    await _onLocationChangedStreamSubscription?.cancel();
+    _onLocationChangedStreamSubscription = _stream?.listen((loc) {
+      _addsMarkerLocationToMarkerLocationStream(loc);
+      setState(() {
+        if (loc.latitude == null || loc.longitude == null) {
+          _currentLocation = LatLng(0, 0);
+        } else {
+          _currentLocation = LatLng(loc.latitude, loc.longitude);
+        }
+
+        // TODO accuracy durchschleifen
+        var height = 20.0 * .5; // (1 - (onValue.accuracy / 100));
+        var width = 20.0 * .5; // (1 - (onValue.accuracy / 100));
+        if (height < 0 || width < 0) {
+          height = 20;
+          width = 20;
+        }
+
+        if (_locationMarker != null) {
+          widget.options.markers.remove(_locationMarker);
+        }
+
+        printLog("Direction : " + (_direction ?? 0).toString());
+
+        _locationMarker = UserLocationMarker(
+          height: 20.0,
+          width: 20.0,
+          point:
+          LatLng(_currentLocation.latitude, _currentLocation.longitude),
+          builder: (context) {
+            return Stack(
+              alignment: AlignmentDirectional.center,
+              children: <Widget>[
+                if (_direction != null && widget.options.showHeading)
+                  Transform.rotate(
+                    angle: _direction / 180 * math.pi,
+                    child: CustomPaint(
+                      size: Size(60.0, 60.0),
+                      painter: MyDirectionPainter(),
+                    ),
+                  ),
+                Container(
+                  height: 20.0,
+                  width: 20.0,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.blue[300].withOpacity(0.7),
+                  ),
+                ),
+                widget.options.markerWidget ??
+                    Container(
+                      height: 10,
+                      width: 10,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.blueAccent,
+                      ),
+                    ),
+              ],
+            );
+          },
+        );
+
+        widget.options.markers.add(_locationMarker);
+
+        if (widget.options.updateMapLocationOnPositionChange &&
+            widget.options.mapController != null) {
+          _moveMapToCurrentLocation();
+        } else if (widget.options.updateMapLocationOnPositionChange) {
+          if (!widget.options.updateMapLocationOnPositionChange) {
+            widget.map.fitBounds(widget.map.bounds, FitBoundsOptions());
+          }
+          printLog(
+              "Warning: updateMapLocationOnPositionChange set to true, but no mapController provided: can't move map");
+        } else {
+          forceMapUpdate();
+        }
+
+        if (widget.options.zoomToCurrentLocationOnLoad && (!mapLoaded)) {
+          setState(() {
+            mapLoaded = true;
+          });
+          animatedMapMove(_currentLocation, widget.options.defaultZoom,
+              widget.options.mapController, this);
+        }
+      });
+    });
+    /*
     var location = Location();
     if (await location.requestService() &&
         await location.changeSettings(
@@ -210,6 +301,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
         });
       });
     }
+     */
   }
 
   void _moveMapToCurrentLocation({double zoom}) {
@@ -225,6 +317,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   }
 
   void _handleLocationStatusChanges() {
+    /*
     printLog(_stream.toString());
     bool _locationStatusChanged;
     if (_locationStatusChanged == null) {
@@ -241,10 +334,12 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
         }
       });
     }
+     */
   }
 
-  void _handleCompassDirection() {
+  Future<void> _handleCompassDirection() async {
     if (widget.options.showHeading) {
+      await _compassStreamSubscription?.cancel();
       _compassStreamSubscription =
           FlutterCompass.events.listen((double direction) {
         setState(() {
@@ -255,12 +350,12 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
     }
   }
 
-  _addsMarkerLocationToMarkerLocationStream(LocationData onValue) {
+  _addsMarkerLocationToMarkerLocationStream(LatLng onValue) {
     if (widget.options.onLocationUpdate == null) {
       printLog("Stream not provided");
     } else {
       widget.options
-          .onLocationUpdate(LatLng(onValue.latitude, onValue.longitude));
+          .onLocationUpdate(onValue);
     }
   }
 
