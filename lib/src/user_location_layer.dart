@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_compass/flutter_compass.dart';
+//import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter_map/plugin_api.dart';
 import 'package:user_location/src/user_location_marker.dart';
 import 'package:user_location/src/user_location_options.dart';
@@ -26,7 +26,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   LatLng _currentLocation;
   UserLocationMarker _locationMarker;
-  Stream<LatLng> _stream;
+  Stream<SimpleLocationData> _stream;
   // EventChannel _stream = EventChannel('locationStatusStream');
   // var location = Location();
 
@@ -35,13 +35,14 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
 
   double _direction;
 
-  StreamSubscription<LatLng> _onLocationChangedStreamSubscription;
+  StreamSubscription<SimpleLocationData> _onLocationChangedStreamSubscription;
   StreamSubscription<double> _compassStreamSubscription;
   StreamSubscription _locationStatusChangeSubscription;
 
   @override
   void initState() {
     super.initState();
+    this._stream = widget.options.inputStream;
     WidgetsBinding.instance.addObserver(this);
 
     initialStateOfupdateMapLocationOnPositionChange =
@@ -123,18 +124,19 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   Future<void> _subscribeToLocationChanges() async {
     printLog("OnSubscribe to location change");
     await _onLocationChangedStreamSubscription?.cancel();
-    _onLocationChangedStreamSubscription = _stream?.listen((loc) {
+    _onLocationChangedStreamSubscription = _stream?.listen((locData) {
+      final loc = LatLng (locData.lat, locData.lng);
       _addsMarkerLocationToMarkerLocationStream(loc);
       setState(() {
+        _direction = locData.heading == -1 ? null : locData.heading;
         if (loc.latitude == null || loc.longitude == null) {
           _currentLocation = LatLng(0, 0);
         } else {
           _currentLocation = LatLng(loc.latitude, loc.longitude);
         }
 
-        // TODO accuracy durchschleifen
-        var height = 20.0 * .5; // (1 - (onValue.accuracy / 100));
-        var width = 20.0 * .5; // (1 - (onValue.accuracy / 100));
+        var height = 20.0 * (1 - (locData.accuracy / 100));
+        var width = 20.0 *  (1 - (locData.accuracy / 100));
         if (height < 0 || width < 0) {
           height = 20;
           width = 20;
@@ -338,6 +340,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   }
 
   Future<void> _handleCompassDirection() async {
+    /*
     if (widget.options.showHeading) {
       await _compassStreamSubscription?.cancel();
       _compassStreamSubscription =
@@ -348,6 +351,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
         forceMapUpdate();
       });
     }
+     */
   }
 
   _addsMarkerLocationToMarkerLocationStream(LatLng onValue) {

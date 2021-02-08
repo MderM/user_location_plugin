@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/plugin_api.dart';
 import 'package:latlong/latlong.dart';
 
+class SimpleLocationData {
+  double lat;
+  double lng;
+  double heading;
+  double accuracy;
+}
+
 class UserLocationOptions extends LayerOptions {
   BuildContext context;
   List<Marker> markers;
@@ -13,7 +20,7 @@ class UserLocationOptions extends LayerOptions {
   bool zoomToCurrentLocationOnLoad;
   Widget moveToCurrentLocationFloatingActionButton;
 
-  Stream<LatLng> inputStream;
+  Stream<SimpleLocationData> inputStream;
   Function(LatLng) onLocationUpdate;
   Function() onTapFAB;
 
