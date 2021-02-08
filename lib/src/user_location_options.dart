@@ -40,6 +40,7 @@ class UserLocationOptions extends LayerOptions {
   UserLocationOptions(
       {@required this.context,
       @required this.markers,
+      this.inputStream,
       this.mapController,
       this.markerWidget,
       this.onLocationUpdate,
