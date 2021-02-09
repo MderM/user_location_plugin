@@ -28,7 +28,6 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   UserLocationMarker _locationMarker;
   Stream<SimpleLocationData> _stream;
   EventChannel _stautusStream = EventChannel('locationStatusStream');
-  var location = Location();
 
   bool mapLoaded;
   bool initialStateOfupdateMapLocationOnPositionChange;
@@ -99,17 +98,17 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
       bool _serviceEnabled;
       PermissionStatus _permissionGranted;
 
-      _serviceEnabled = await location.serviceEnabled();
+      _serviceEnabled = await Location.instance.serviceEnabled();
       if (!_serviceEnabled) {
-        _serviceEnabled = await location.requestService();
+        _serviceEnabled = await Location.instance.requestService();
         if (!_serviceEnabled) {
           return;
         }
       }
 
-      _permissionGranted = await location.hasPermission();
+      _permissionGranted = await Location.instance.hasPermission();
       if (_permissionGranted == PermissionStatus.denied) {
-        _permissionGranted = await location.requestPermission();
+        _permissionGranted = await Location.instance.requestPermission();
         if (_permissionGranted != PermissionStatus.granted) {
           return;
         }
@@ -221,11 +220,11 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
         });
       });
     } else {
-      if (await location.requestService() &&
-          await location.changeSettings(
+      if (await Location.instance.requestService() &&
+          await Location.instance.changeSettings(
               interval: widget.options.locationUpdateIntervalMs)) {
         _internalLocationStreamSubscription =
-            location.onLocationChanged.listen((onValue) {
+            Location.instance.onLocationChanged.listen((onValue) {
               _addsMarkerLocationToMarkerLocationStream(LatLng(onValue.latitude, onValue.longitude));
               setState(() {
                 if (onValue.latitude == null || onValue.longitude == null) {
