@@ -33,6 +33,7 @@ class UserLocationOptions extends LayerOptions {
 
   bool verbose;
   bool showHeading;
+  bool externalHeading;
 
   double defaultZoom;
 
@@ -49,6 +50,7 @@ class UserLocationOptions extends LayerOptions {
   UserLocationOptions(
       {@required this.context,
       @required this.markers,
+      this.externalHeading: false,
       this.inputStream,
       this.mapController,
       this.markerWidget,

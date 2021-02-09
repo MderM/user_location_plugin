@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
-//import 'package:flutter_compass/flutter_compass.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter_map/plugin_api.dart';
 import 'package:user_location/src/user_location_marker.dart';
 import 'package:user_location/src/user_location_options.dart';
@@ -77,9 +77,10 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
         case AppLifecycleState.inactive:
         case AppLifecycleState.paused:
           _onLocationChangedStreamSubscription?.cancel();
+          _compassStreamSubscription?.cancel();
           break;
         case AppLifecycleState.resumed:
-          _subscribeToLocationChanges();
+          initialize();
           break;
         case AppLifecycleState.detached:
           break;
@@ -127,7 +128,9 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
       final loc = LatLng (locData.lat, locData.lng);
       _addsMarkerLocationToMarkerLocationStream(loc);
       setState(() {
-        _direction = locData.heading == -1 ? null : locData.heading;
+        if(widget.options.showHeading && widget.options.externalHeading) {
+          _direction = locData.heading == -1 ? null : locData.heading;
+        }
         if (loc.latitude == null || loc.longitude == null) {
           _currentLocation = LatLng(0, 0);
         } else {
@@ -339,8 +342,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   }
 
   Future<void> _handleCompassDirection() async {
-    /*
-    if (widget.options.showHeading) {
+    if (widget.options.showHeading && !widget.options.externalHeading) {
       await _compassStreamSubscription?.cancel();
       _compassStreamSubscription =
           FlutterCompass.events.listen((double direction) {
@@ -350,7 +352,6 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
         forceMapUpdate();
       });
     }
-     */
   }
 
   _addsMarkerLocationToMarkerLocationStream(LatLng onValue) {
