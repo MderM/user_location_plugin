@@ -79,7 +79,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
           _onLocationChangedStreamSubscription?.cancel();
           break;
         case AppLifecycleState.resumed:
-          _handleLocationStatusChanges();
+          _subscribeToLocationChanges();
           break;
         case AppLifecycleState.detached:
           break;
