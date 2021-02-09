@@ -459,7 +459,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
 
   void forceMapUpdate() {
     if (widget.map != null) {
-      widget.map.rebuildLayers();
+      widget.map.forceRebuild();
     } else {
       var zoom = widget.options.mapController.zoom;
       widget.options.mapController.move(widget.options.mapController.center,
