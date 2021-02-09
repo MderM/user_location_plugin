@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 //import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter_map/plugin_api.dart';
@@ -80,7 +79,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
           _onLocationChangedStreamSubscription?.cancel();
           break;
         case AppLifecycleState.resumed:
-          _onLocationChangedStreamSubscription?.resume();
+          _handleLocationStatusChanges();
           break;
         case AppLifecycleState.detached:
           break;
