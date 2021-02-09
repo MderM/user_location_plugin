@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter_map/plugin_api.dart';
 import 'package:user_location/src/user_location_marker.dart';
 import 'package:user_location/src/user_location_options.dart';
 import 'package:latlong/latlong.dart';
-//import 'package:location/location.dart';
+import 'package:location/location.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import "dart:math" show pi;
@@ -26,8 +27,8 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   LatLng _currentLocation;
   UserLocationMarker _locationMarker;
   Stream<SimpleLocationData> _stream;
-  // EventChannel _stream = EventChannel('locationStatusStream');
-  // var location = Location();
+  EventChannel _stautusStream = EventChannel('locationStatusStream');
+  var location = Location();
 
   bool mapLoaded;
   bool initialStateOfupdateMapLocationOnPositionChange;
@@ -35,7 +36,8 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   double _direction;
 
   StreamSubscription<SimpleLocationData> _onLocationChangedStreamSubscription;
-  StreamSubscription<double> _compassStreamSubscription;
+  StreamSubscription<LocationData> _internalLocationStreamSubscription;
+  StreamSubscription<CompassEvent> _compassStreamSubscription;
   StreamSubscription _locationStatusChangeSubscription;
 
   @override
@@ -56,10 +58,15 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _cancelAll();
+    super.dispose();
+  }
+
+  void _cancelAll() {
     _locationStatusChangeSubscription?.cancel();
     _onLocationChangedStreamSubscription?.cancel();
+    _internalLocationStreamSubscription?.cancel();
     _compassStreamSubscription?.cancel();
-    super.dispose();
   }
 
   @override
@@ -76,8 +83,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
       switch (state) {
         case AppLifecycleState.inactive:
         case AppLifecycleState.paused:
-          _onLocationChangedStreamSubscription?.cancel();
-          _compassStreamSubscription?.cancel();
+          _cancelAll();
           break;
         case AppLifecycleState.resumed:
           initialize();
@@ -89,26 +95,26 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   }
 
   void initialize() async {
-    /*
-    bool _serviceEnabled;
-    PermissionStatus _permissionGranted;
+    if (widget.options.inputStream == null) {
+      bool _serviceEnabled;
+      PermissionStatus _permissionGranted;
 
-    _serviceEnabled = await location.serviceEnabled();
-    if (!_serviceEnabled) {
-      _serviceEnabled = await location.requestService();
+      _serviceEnabled = await location.serviceEnabled();
       if (!_serviceEnabled) {
-        return;
+        _serviceEnabled = await location.requestService();
+        if (!_serviceEnabled) {
+          return;
+        }
       }
-    }
 
-    _permissionGranted = await location.hasPermission();
-    if (_permissionGranted == PermissionStatus.denied) {
-      _permissionGranted = await location.requestPermission();
-      if (_permissionGranted != PermissionStatus.granted) {
-        return;
+      _permissionGranted = await location.hasPermission();
+      if (_permissionGranted == PermissionStatus.denied) {
+        _permissionGranted = await location.requestPermission();
+        if (_permissionGranted != PermissionStatus.granted) {
+          return;
+        }
       }
     }
-     */
 
     _handleLocationStatusChanges();
     _subscribeToLocationChanges();
@@ -124,112 +130,22 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   Future<void> _subscribeToLocationChanges() async {
     printLog("OnSubscribe to location change");
     await _onLocationChangedStreamSubscription?.cancel();
-    _onLocationChangedStreamSubscription = _stream?.listen((locData) {
-      final loc = LatLng (locData.lat, locData.lng);
-      _addsMarkerLocationToMarkerLocationStream(loc);
-      setState(() {
-        if(widget.options.showHeading && widget.options.externalHeading) {
-          _direction = locData.heading == -1 ? null : locData.heading;
-        }
-        if (loc.latitude == null || loc.longitude == null) {
-          _currentLocation = LatLng(0, 0);
-        } else {
-          _currentLocation = LatLng(loc.latitude, loc.longitude);
-        }
-
-        var height = 20.0 * (1 - (locData.accuracy / 100));
-        var width = 20.0 *  (1 - (locData.accuracy / 100));
-        if (height < 0 || width < 0) {
-          height = 20;
-          width = 20;
-        }
-
-        if (_locationMarker != null) {
-          widget.options.markers.remove(_locationMarker);
-        }
-
-        printLog("Direction : " + (_direction ?? 0).toString());
-
-        _locationMarker = UserLocationMarker(
-          height: 20.0,
-          width: 20.0,
-          point:
-          LatLng(_currentLocation.latitude, _currentLocation.longitude),
-          builder: (context) {
-            return Stack(
-              alignment: AlignmentDirectional.center,
-              children: <Widget>[
-                if (_direction != null && widget.options.showHeading)
-                  Transform.rotate(
-                    angle: _direction / 180 * math.pi,
-                    child: CustomPaint(
-                      size: Size(60.0, 60.0),
-                      painter: MyDirectionPainter(),
-                    ),
-                  ),
-                Container(
-                  height: 20.0,
-                  width: 20.0,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.blue[300].withOpacity(0.7),
-                  ),
-                ),
-                widget.options.markerWidget ??
-                    Container(
-                      height: 10,
-                      width: 10,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.blueAccent,
-                      ),
-                    ),
-              ],
-            );
-          },
-        );
-
-        widget.options.markers.add(_locationMarker);
-
-        if (widget.options.updateMapLocationOnPositionChange &&
-            widget.options.mapController != null) {
-          _moveMapToCurrentLocation();
-        } else if (widget.options.updateMapLocationOnPositionChange) {
-          if (!widget.options.updateMapLocationOnPositionChange) {
-            widget.map.fitBounds(widget.map.bounds, FitBoundsOptions());
-          }
-          printLog(
-              "Warning: updateMapLocationOnPositionChange set to true, but no mapController provided: can't move map");
-        } else {
-          forceMapUpdate();
-        }
-
-        if (widget.options.zoomToCurrentLocationOnLoad && (!mapLoaded)) {
-          setState(() {
-            mapLoaded = true;
-          });
-          animatedMapMove(_currentLocation, widget.options.defaultZoom,
-              widget.options.mapController, this);
-        }
-      });
-    });
-    /*
-    var location = Location();
-    if (await location.requestService() &&
-        await location.changeSettings(
-            interval: widget.options.locationUpdateIntervalMs)) {
-      _onLocationChangedStreamSubscription =
-          location.onLocationChanged.listen((onValue) {
-        _addsMarkerLocationToMarkerLocationStream(onValue);
+    if (_stream != null) {
+      _onLocationChangedStreamSubscription = _stream?.listen((locData) {
+        final loc = LatLng (locData.lat, locData.lng);
+        _addsMarkerLocationToMarkerLocationStream(loc);
         setState(() {
-          if (onValue.latitude == null || onValue.longitude == null) {
+          if(widget.options.showHeading && widget.options.externalHeading) {
+            _direction = locData.heading == -1 ? null : locData.heading;
+          }
+          if (loc.latitude == null || loc.longitude == null) {
             _currentLocation = LatLng(0, 0);
           } else {
-            _currentLocation = LatLng(onValue.latitude, onValue.longitude);
+            _currentLocation = LatLng(loc.latitude, loc.longitude);
           }
 
-          var height = 20.0 * (1 - (onValue.accuracy / 100));
-          var width = 20.0 * (1 - (onValue.accuracy / 100));
+          var height = 20.0 * (1 - (locData.accuracy / 100));
+          var width = 20.0 *  (1 - (locData.accuracy / 100));
           if (height < 0 || width < 0) {
             height = 20;
             width = 20;
@@ -245,7 +161,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
             height: 20.0,
             width: 20.0,
             point:
-                LatLng(_currentLocation.latitude, _currentLocation.longitude),
+            LatLng(_currentLocation.latitude, _currentLocation.longitude),
             builder: (context) {
               return Stack(
                 alignment: AlignmentDirectional.center,
@@ -304,8 +220,98 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
           }
         });
       });
+    } else {
+      if (await location.requestService() &&
+          await location.changeSettings(
+              interval: widget.options.locationUpdateIntervalMs)) {
+        _internalLocationStreamSubscription =
+            location.onLocationChanged.listen((onValue) {
+              _addsMarkerLocationToMarkerLocationStream(LatLng(onValue.latitude, onValue.longitude));
+              setState(() {
+                if (onValue.latitude == null || onValue.longitude == null) {
+                  _currentLocation = LatLng(0, 0);
+                } else {
+                  _currentLocation = LatLng(onValue.latitude, onValue.longitude);
+                }
+
+                var height = 20.0 * (1 - (onValue.accuracy / 100));
+                var width = 20.0 * (1 - (onValue.accuracy / 100));
+                if (height < 0 || width < 0) {
+                  height = 20;
+                  width = 20;
+                }
+
+                if (_locationMarker != null) {
+                  widget.options.markers.remove(_locationMarker);
+                }
+
+                printLog("Direction : " + (_direction ?? 0).toString());
+
+                _locationMarker = UserLocationMarker(
+                  height: 20.0,
+                  width: 20.0,
+                  point:
+                  LatLng(_currentLocation.latitude, _currentLocation.longitude),
+                  builder: (context) {
+                    return Stack(
+                      alignment: AlignmentDirectional.center,
+                      children: <Widget>[
+                        if (_direction != null && widget.options.showHeading)
+                          Transform.rotate(
+                            angle: _direction / 180 * math.pi,
+                            child: CustomPaint(
+                              size: Size(60.0, 60.0),
+                              painter: MyDirectionPainter(),
+                            ),
+                          ),
+                        Container(
+                          height: 20.0,
+                          width: 20.0,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.blue[300].withOpacity(0.7),
+                          ),
+                        ),
+                        widget.options.markerWidget ??
+                            Container(
+                              height: 10,
+                              width: 10,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.blueAccent,
+                              ),
+                            ),
+                      ],
+                    );
+                  },
+                );
+
+                widget.options.markers.add(_locationMarker);
+
+                if (widget.options.updateMapLocationOnPositionChange &&
+                    widget.options.mapController != null) {
+                  _moveMapToCurrentLocation();
+                } else if (widget.options.updateMapLocationOnPositionChange) {
+                  if (!widget.options.updateMapLocationOnPositionChange) {
+                    widget.map.fitBounds(widget.map.bounds, FitBoundsOptions());
+                  }
+                  printLog(
+                      "Warning: updateMapLocationOnPositionChange set to true, but no mapController provided: can't move map");
+                } else {
+                  forceMapUpdate();
+                }
+
+                if (widget.options.zoomToCurrentLocationOnLoad && (!mapLoaded)) {
+                  setState(() {
+                    mapLoaded = true;
+                  });
+                  animatedMapMove(_currentLocation, widget.options.defaultZoom,
+                      widget.options.mapController, this);
+                }
+              });
+            });
+      }
     }
-     */
   }
 
   void _moveMapToCurrentLocation({double zoom}) {
@@ -320,13 +326,13 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
     }
   }
 
-  void _handleLocationStatusChanges() {
-    /*
+  Future<void> _handleLocationStatusChanges() async {
     printLog(_stream.toString());
     bool _locationStatusChanged;
     if (_locationStatusChanged == null) {
+      await _locationStatusChangeSubscription?.cancel();
       _locationStatusChangeSubscription =
-          _stream.receiveBroadcastStream().listen((onData) {
+          _stautusStream.receiveBroadcastStream().listen((onData) {
         _locationStatusChanged = onData;
         printLog("LOCATION ACCESS CHANGED: CURRENT-> ${onData ? 'On' : 'Off'}");
         if (onData == false) {
@@ -338,16 +344,15 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
         }
       });
     }
-     */
   }
 
   Future<void> _handleCompassDirection() async {
     if (widget.options.showHeading && !widget.options.externalHeading) {
       await _compassStreamSubscription?.cancel();
       _compassStreamSubscription =
-          FlutterCompass.events.listen((double direction) {
+          FlutterCompass.events.listen((CompassEvent direction) {
         setState(() {
-          _direction = direction;
+          _direction = direction.heading;
         });
         forceMapUpdate();
       });
@@ -383,9 +388,6 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
                     widget.options.updateMapLocationOnPositionChange = false;
                   });
                 }
-
-                ///TODO: initialize listens to various streams without cancelling them first. (this causes undisposed streams to keep listening)
-                //steps to reproduce: 1. open map, 2. click on FAB, 3. exit map.
                 initialize();
                 _moveMapToCurrentLocation(zoom: widget.options.defaultZoom);
                 if (widget.options.onTapFAB != null) {
@@ -458,7 +460,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
 
   void forceMapUpdate() {
     if (widget.map != null) {
-      widget.map.forceRebuild();
+      widget.map.rebuildLayers();
     } else {
       var zoom = widget.options.mapController.zoom;
       widget.options.mapController.move(widget.options.mapController.center,
