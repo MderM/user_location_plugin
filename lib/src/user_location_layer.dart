@@ -246,7 +246,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
   void _handleCompassDirection() {
     if (widget.options.showHeading) {
       _compassStreamSubscription =
-          FlutterCompass.events.listen((double direction) {
+          FlutterCompass.events.map((event) => event.heading).listen((double direction) {
         setState(() {
           _direction = direction;
         });
@@ -359,7 +359,7 @@ class _MapsPluginLayerState extends State<MapsPluginLayer>
 
   void forceMapUpdate() {
     if (widget.map != null) {
-      widget.map.forceRebuild();
+      widget.map.rebuildLayers();
     } else {
       var zoom = widget.options.mapController.zoom;
       widget.options.mapController.move(widget.options.mapController.center,
